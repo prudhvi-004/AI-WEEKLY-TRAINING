@@ -71,6 +71,12 @@ df = df.drop(0, axis=0)
 #to drop multiple rows from the dataframe   
 #--->df = df.drop(index = [0, 1], axis=0)
 
+#to know the missing values in the dataframe
+print(df.isnull())
+
+#to know overall missing values in the dataframe
+print(df.isnull().sum())
+
 #to fill the missing values in the dataframe.
 df = df.fillna(5)  # it will fill the missing values with the specified value
 
