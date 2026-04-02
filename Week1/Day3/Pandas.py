@@ -91,3 +91,17 @@ print(df)
 #to save the dataframe to a json file
 #--->df.to_json('file.json', orient='records') 
 #orient='records' will save the dataframe in a list of dictionaries format in json file.
+
+#to know the unique values in a column of the dataframe
+print(df['Age'].unique())
+
+#value_count()
+#to count the number of occurrences of each unique value in a column of the dataframe
+print(df['Age'].value_counts())
+
+#to know the mean, median, mode of a column in the dataframe
+print("Mean:",df['Age'].mean()) 
+print("Median:",df['Age'].median())
+print("Mode:",df['Age'].mode())
+
+
