@@ -69,3 +69,4 @@ class Son(Father):
 class Daughter(Father):
     pass
 
+
