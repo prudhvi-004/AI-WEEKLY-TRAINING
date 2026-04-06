@@ -53,10 +53,10 @@ def require_password(func):
     def wrapper(self, *args, **kwargs):
         entered = input("Enter password: ")
         if entered == self._password:
-            print("✅ Access granted")
+            print("Access granted")
             return func(self, *args, **kwargs)
         else:
-            print("❌ Wrong password")
+            print("Wrong password")
     return wrapper
 #why the above function is used as a decorator?
 #1. it takes function as an input 
@@ -86,9 +86,9 @@ class BankAccount:
         entered = input("Enter password to update name: ")
         if entered == self._password:
             self.name = new_name
-            print("✅ Name updated successfully")
+            print("Name updated successfully")
         else:
-            print("❌ Wrong password")
+            print(" Wrong password")
 
     # Deleter (delete account data)
     #Deleter --> it is used to delete an attribute. 
@@ -97,12 +97,12 @@ class BankAccount:
     def account_info(self):
         entered = input("Enter password to delete account: ")
         if entered == self._password:
-            print("⚠️ Deleting account data...")
+            print(" Deleting account data...")
             del self.name
             del self.bank
             del self.balance
         else:
-            print("❌ Wrong password")
+            print(" Wrong password")
 
     @require_password
     def deposit(self, amount):
