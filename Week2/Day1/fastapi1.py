@@ -1,7 +1,7 @@
 #--------------------------------------------CREATE FIRST API ENDPOINT ----------------------
 
 from fastapi import FastAPI,Body    # importing the FASTAPI
-app = FastAPI()                  # It craete an API Application
+app = FastAPI()                  # It create an API Application
 
 @app.get("/user")                    #It define an End-Point (url)
 async def get_user():
@@ -40,6 +40,15 @@ async def get_book(book_title: str):
     for book in BOOKS:
         if book.get("title").casefold() == book_title.casefold():  #casefold() ---> converts text into lowercase..
             return book
+        
+@app.get("/books/category/{category}")
+async def get_books_bycategory(category: str):
+    book_list = []
+    for book in BOOKS:
+        if book.get("category") and book.get("category").casefold() == category.casefold():
+            book_list.append(book)
+
+    return book_list
         
 
 
@@ -84,7 +93,7 @@ def create_book(book: dict):
     return {"message": "Book added"}
 
 #---------------------------------------PUT REQUEST METHOD-------------------------------------
-# It is used to update an existing book (full replacement)
+# It is used to update an existing resource completely (full replacement)
 #replace old data with new data
 
 @app.put("/books/update_book")
@@ -94,4 +103,13 @@ async def update_book(updated_book=Body()):
             BOOKS[i] = updated_book
             return {"message": "Book updated successfully"}
         
-        
+#-------------------------------DELETE REQUEST METHOD------------------------------
+#it is used to remove data from the server
+#it uses path parameters as an identifier
+
+@app.delete("/books/delete_book/{book_title}")
+async def delete_book(book_title: str):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].get("title").casefold() == book_title.casefold():
+            BOOKS.pop(i)
+            break
