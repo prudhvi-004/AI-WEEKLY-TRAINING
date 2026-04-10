@@ -1,5 +1,5 @@
 from typing import Optional   # Optional → field can be missing / None
-from fastapi import FastAPI, Path, Query  # FastAPI → framework to build APIs
+from fastapi import FastAPI, Path, Query, HTTPException  # FastAPI → framework to build APIs
 from pydantic import BaseModel, Field   # BaseModel → validation model, Field → add rules/constraints
 
 app = FastAPI()   # FastAPI() → creates API app instance
@@ -79,6 +79,7 @@ async def get_book_by_id(book_id: int = Path(gt=0)):
     for book in BOOKS:
         if book.id == book_id:
             return book
+    raise HTTPException(status_code=404,detail="Book Id not found")
         
 
  #to get book by rating.. Query Param
@@ -113,19 +114,28 @@ async def add_book(book_request: BookRequest):   #here we added the data validat
 #Update book using ID 
 @app.put("/books/updatebook/")
 async def update_book(upd_book: BookRequest):
+    book_changed = False
     for i in range(len(BOOKS)):
         if BOOKS[i].id == upd_book.id:
             BOOKS[i] = upd_book
             upd_book.id = i+1
+            book_changed = True
+    if not book_changed:
+        raise HTTPException(status_code=404, detail='Item not found')
+
 
 
 #Delete a book using ID..
 @app.delete("/books/deletebook/{id}")
 async def delete_book(id: int = Path(gt=0)):
+    book_deleted = False
     for i in range(len(BOOKS)):
         if BOOKS[i].id == id:
             BOOKS.pop(i)
+            book_deleted = True
             break
+    if not book_deleted:
+        raise HTTPException(status_code=404,detail="Item Not Found")
         
 #function for assigning ID for book..
 def assign_book_id(book: Book):   # function → custom logic
