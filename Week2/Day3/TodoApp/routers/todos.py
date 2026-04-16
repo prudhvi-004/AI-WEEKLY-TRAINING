@@ -1,80 +1,164 @@
+# =========================
+# 🔹 IMPORTS
+# =========================
+
 from typing import Annotated
+# WHY?
+# Used to combine type + dependency (clean DI)
+
 from pydantic import BaseModel, Field
+# WHY?
+# BaseModel → request validation
+# Field → add constraints
+
 from sqlalchemy.orm import Session
+# WHY?
+# DB session to interact with database
+
 from fastapi import APIRouter, Depends, HTTPException, Path
+# WHY?
+# APIRouter → group routes
+# Depends → dependency injection
+# HTTPException → error handling
+# Path → validate path parameters
+
 from starlette import status
+# WHY?
+# Clean HTTP status codes
+
 from model import Todos
+# WHY?
+# ORM model (table representation)
+
 from database import SessionLocal
+# WHY?
+# DB connection factory
+
 from .auth import get_current_user
+# WHY?
+# Extract logged-in user from JWT
 
 router = APIRouter()
 
+# =========================
+# 🔹 DATABASE DEPENDENCY
+# =========================
 
 # DB Dependency
 def get_db():
-    db = SessionLocal()
+    db = SessionLocal()   # open DB connection
     try:
-        yield db
+        yield db          # give DB to API
     finally:
-        db.close()
+        db.close()        # close after request
+
+# WHY?
+# Prevents DB connection leaks
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
+# WHY?
+# Inject DB automatically
+
 user_dependency = Annotated[dict,Depends(get_current_user)]
 #It creates a shortcut that means:
 #that takes a validation from user first(means:it create a lock to do any action)
 #“Give me the current logged-in user (from JWT token) whenever I use this.”
 
-
 # Request Model
 class TodoRequest(BaseModel):
+
     title: str = Field(min_length=3)
+
     description: str = Field(min_length=3, max_length=100)
+  
     priority: int = Field(gt=0, lt=6)
+
     complete: bool
+
+# =========================
+# 🔹 READ ALL TODOS
+# =========================
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(user: user_dependency, db: db_dependency):
+
+    # Check authentication
     if user is None:
         raise HTTPException(status_code=401, detail='Authentication Failed')
-    return db.query(Todos).filter(Todos.owner_id == user.get('id')).all()
+
+    # Fetch only current user's todos
+    return db.query(Todos)\
+        .filter(Todos.owner_id == user.get('id'))\
+        .all()
+
+# THEORY:
+# Multi-user system → must isolate data
 
 
 @router.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
-async def read_todo(user: user_dependency, db: db_dependency, todo_id: int = Path(gt=0)):
+async def read_todo(user: user_dependency, db: db_dependency,
+                    todo_id: int = Path(gt=0)):
+
+    # Validate user
     if user is None:
         raise HTTPException(status_code=401, detail='Authentication Failed')
 
-    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
-        .filter(Todos.owner_id == user.get('id')).first()
-    if todo_model is not None:
+    # Fetch todo with:
+    # ✔ matching ID
+    # ✔ belongs to current user
+    todo_model = db.query(Todos)\
+        .filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id == user.get('id'))\
+        .first()
+
+    if todo_model:
         return todo_model
+
     raise HTTPException(status_code=404, detail='Todo not found.')
+
+# THEORY:
+# Double filtering prevents unauthorized access
 
 
 @router.post("/todo", status_code=status.HTTP_201_CREATED)
 async def create_todo(user: user_dependency, db: db_dependency,
                       todo_request: TodoRequest):
+
     if user is None:
         raise HTTPException(status_code=401, detail='Authentication Failed')
-    todo_model = Todos(**todo_request.model_dump(), owner_id=user.get('id'))
+
+    # Convert request → DB object
+    todo_model = Todos(
+        **todo_request.model_dump(),  # unpack fields
+        owner_id=user.get('id')       # link to user
+    )
 
     db.add(todo_model)
     db.commit()
+
+# THEORY:
+# model_dump() → converts Pydantic → dict
 
 
 @router.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def update_todo(user: user_dependency, db: db_dependency,
                       todo_request: TodoRequest,
                       todo_id: int = Path(gt=0)):
+
     if user is None:
         raise HTTPException(status_code=401, detail='Authentication Failed')
 
-    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
-        .filter(Todos.owner_id == user.get('id')).first()
-    if todo_model is None:
+    # Get existing todo
+    todo_model = db.query(Todos)\
+        .filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id == user.get('id'))\
+        .first()
+
+    if not todo_model:
         raise HTTPException(status_code=404, detail='Todo not found.')
 
+    # Update fields
     todo_model.title = todo_request.title
     todo_model.description = todo_request.description
     todo_model.priority = todo_request.priority
@@ -83,16 +167,33 @@ async def update_todo(user: user_dependency, db: db_dependency,
     db.add(todo_model)
     db.commit()
 
+# THEORY:
+# Ensures only owner can update
+
 
 @router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_todo(user: user_dependency, db: db_dependency, todo_id: int = Path(gt=0)):
+async def delete_todo(user: user_dependency, db: db_dependency,
+                      todo_id: int = Path(gt=0)):
+
     if user is None:
         raise HTTPException(status_code=401, detail='Authentication Failed')
 
-    todo_model = db.query(Todos).filter(Todos.id == todo_id)\
-        .filter(Todos.owner_id == user.get('id')).first()
-    if todo_model is None:
+    # Check existence
+    todo_model = db.query(Todos)\
+        .filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id == user.get('id'))\
+        .first()
+
+    if not todo_model:
         raise HTTPException(status_code=404, detail='Todo not found.')
-    db.query(Todos).filter(Todos.id == todo_id).filter(Todos.owner_id == user.get('id')).delete()
+
+    # Delete
+    db.query(Todos)\
+        .filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id == user.get('id'))\
+        .delete()
 
     db.commit()
+
+# THEORY:
+# Prevents deleting others’ data
