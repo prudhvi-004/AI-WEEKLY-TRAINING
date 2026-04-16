@@ -48,6 +48,8 @@ router = APIRouter()
 # Groups all todo-related APIs
 
 
+
+
 # =========================
 # 🔹 DATABASE DEPENDENCY
 # =========================
@@ -71,6 +73,8 @@ db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 # WHY?
 # Inject current user from JWT
+
+
 
 
 # =========================
