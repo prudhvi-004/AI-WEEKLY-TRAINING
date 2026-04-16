@@ -10,6 +10,7 @@ from .auth import get_current_user
 router = APIRouter()
 
 
+# DB Dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -19,15 +20,18 @@ def get_db():
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
-user_dependency = Annotated[dict, Depends(get_current_user)]
+user_dependency = Annotated[dict,Depends(get_current_user)]
+#It creates a shortcut that means:
+#that takes a validation from user first(means:it create a lock to do any action)
+#“Give me the current logged-in user (from JWT token) whenever I use this.”
 
 
+# Request Model
 class TodoRequest(BaseModel):
     title: str = Field(min_length=3)
     description: str = Field(min_length=3, max_length=100)
     priority: int = Field(gt=0, lt=6)
     complete: bool
-
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(user: user_dependency, db: db_dependency):

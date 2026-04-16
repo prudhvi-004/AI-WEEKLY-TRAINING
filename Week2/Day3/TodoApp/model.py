@@ -1,47 +1,38 @@
-# Import Base → parent class for all tables (comes from declarative_base)
+# Import Base → parent class for all tables
 from database import Base 
 
-# Import Column and data types → used to define table structure
-from sqlalchemy import Column, Integer, String, Boolean
+# Import Column and data types
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 
 
-# Create a class → represents a TABLE in database
-# WHY class?
-# Because SQLAlchemy maps Python class → DB table (ORM concept)
-class Todos(Base):
+class Users(Base):
 
-    # Table name in database
-    # WHY?
-    # This is the actual name that will appear in SQLite (todos.db)
-    __tablename__ = 'todo'
+    __tablename__ = 'users'
 
-
-    # Column 1: id
-    # Integer → number type
-    # primary_key=True → uniquely identifies each row
-    # index=True → makes searching faster (like adding index in DB)
+    # ✅ FIX: change String → Integer (auto-increment works now)
     id = Column(Integer, primary_key=True, index=True)
 
+    email = Column(String, unique=True)
+    username = Column(String, unique=True)
+    first_name = Column(String)
+    last_name = Column(String)
+    hashed_password = Column(String)
 
-    # Column 2: title
-    # String → text type
-    # Stores task title
+    # Optional improvement: default value
+    is_active = Column(Boolean, default=True)
+
+    role = Column(String)
+
+
+class Todos(Base):
+
+    __tablename__ = 'todo'
+
+    id = Column(Integer, primary_key=True, index=True)
     title = Column(String)
-
-
-    # Column 3: description
-    # String → text type
-    # Stores more details about task
     description = Column(String)
-
-
-    # Column 4: priority
-    # Integer → number type
-    # You can use values like 1 (high), 2 (medium), 3 (low)
     priority = Column(Integer)
-
-
-    # Column 5: complete
-    # Boolean → True/False
-    # default=False → when new task is created, it is incomplete by default
     complete = Column(Boolean, default=False)
+
+    # ✅ This will now correctly link to Users.id
+    owner_id = Column(Integer, ForeignKey('users.id'))

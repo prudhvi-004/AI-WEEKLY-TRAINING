@@ -13,7 +13,7 @@ from sqlalchemy.ext.declarative import declarative_base
 # sqlite → database type
 # /// → relative path
 # ./todos.db → file will be created in current folder
-SQLALCHEMY_DB_URL = 'sqlite:///./todos.db'
+SQLALCHEMY_DB_URL = 'sqlite:///./todoapp.db'
 
 
 # create_engine → creates the actual connection to DB
