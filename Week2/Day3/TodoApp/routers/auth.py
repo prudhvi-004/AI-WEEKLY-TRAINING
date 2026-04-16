@@ -1,293 +1,130 @@
-# =========================
-# 🔹 IMPORTS
-# =========================
-
-from datetime import timedelta, datetime, timezone
-# datetime → get current time
-# timedelta → define expiry duration
-# timezone → ensures UTC time (important for JWT)
-
-from typing import Annotated
-# Annotated → combines type + dependency (modern FastAPI style)
-
-from fastapi import APIRouter, Depends, HTTPException
-# APIRouter → group routes (/auth)
-# Depends → dependency injection (auto-run functions)
-# HTTPException → return API errors
-
-from pydantic import BaseModel, Field
-# BaseModel → validates request body
-# Field → adds rules (min length, etc.)
-
-from sqlalchemy.orm import Session
-# Session → DB connection object
-
-from starlette import status
-# status → HTTP status codes (401, 201, etc.)
-
-from database import SessionLocal
-# SessionLocal → creates DB session
-
+from fastapi import APIRouter,Depends, HTTPException
 from model import Users
-# Users → your DB table (ORM model)
-
+from pydantic import BaseModel
 from passlib.context import CryptContext
-# CryptContext → handles password hashing
-
+from database import SessionLocal
+from sqlalchemy.orm import Session
+from typing import Annotated
+from starlette import status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-# OAuth2PasswordRequestForm → reads username & password (LOGIN FORM)
-# OAuth2PasswordBearer → reads token from request header
+from jose import jwt,JWTError
+from datetime import timedelta,datetime,timezone
 
-from jose import jwt, JWTError
-# jwt → create & decode token
-# JWTError → handle token errors
+router = APIRouter(prefix='/auth',tags=['auth'])
 
+SECRET_KEY = '197b2c37c391bed93fe80344fe73b806947a65e36206e05a1a23c2fa12702fe3'
+ALGORITHM = 'HS256'
 
-# =========================
-# 🔹 ROUTER SETUP
-# =========================
+bcrypt_context = CryptContext(schemes=['bcrypt'],deprecated='auto')
 
-router = APIRouter(
-    prefix="/auth",   # All endpoints start with /auth
-    tags=["Auth"]     # Group name in Swagger UI
-)
-
-# 🔥 WHAT THIS BLOCK DOES:
-# Groups all authentication APIs together
-# Example:
-# /auth/token
-# /auth/
-
-
-# =========================
-# 🔹 SECURITY CONFIG
-# =========================
-
-SECRET_KEY = "your-secret-key"
-# 🔐 Used to SIGN JWT (very important)
-
-ALGORITHM = "HS256"
-# 🔐 Algorithm used to encode JWT
-
-bcrypt_context = CryptContext(
-    schemes=["bcrypt"],   # use bcrypt hashing
-    deprecated="auto"
-)
-
-# 🔥 WHAT THIS BLOCK DOES:
-# Defines how passwords will be hashed & verified
-
-
-oauth2_bearer = OAuth2PasswordBearer(
-    tokenUrl="auth/token"
-)
-
-# 🔥 WHAT THIS BLOCK DOES:
-# Extracts JWT token from request header:
-# Authorization: Bearer <token>
-
-
-# =========================
-# 🔹 Pydantic MODELS
-# =========================
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token') #my app uses OAuth2bearer tokens & user will get their token from this url("token").
 
 class CreateUserRequest(BaseModel):
-    username: str = Field(min_length=3)
+    username: str
     email: str
     first_name: str
     last_name: str
-    password: str = Field(min_length=5)
+    password: str 
     role: str
 
-# 🔥 WHAT THIS BLOCK DOES:
-# Validates incoming user data when creating account
 
-
+#it’s the response structure for your login API.
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-# 🔥 WHAT THIS BLOCK DOES:
-# Defines login response structure
-
-
-# =========================
-# 🔹 DATABASE DEPENDENCY
-# =========================
 
 def get_db():
-    db = SessionLocal()   # create DB connection
+    db = SessionLocal()
     try:
-        yield db          # give DB to API
+        yield db 
     finally:
-        db.close()        # always close connection
-
-# 🔥 WHAT THIS BLOCK DOES:
-# Manages DB lifecycle (open → use → close)
+        db.close()
 
 
-db_dependency = Annotated[Session, Depends(get_db)]
+db_dependency = Annotated[Session, Depends(get_db)]  #to get a db session insidea funtion so we can perform operations.
 
-# 🔥 WHAT THIS BLOCK DOES:
-# Shortcut so we can just write:
-# db: db_dependency
-
-
-# =========================
-# 🔹 AUTH FUNCTION
-# =========================
-
+#2 --> it is an function
 def authenticate_user(username: str, password: str, db):
-
-    # 🔹 Get user from DB
+    # 🔹 Step 1: Query the database to find a user with the given username
+    # db = SQLAlchemy Session (used to interact with DB)
+    # Users = your table/model
     user = db.query(Users).filter(Users.username == username).first()
 
-    # 🔹 If user not found
+    # 🔹 Step 2: If user does not exist → return False
+    # Means authentication failed (wrong username)
     if not user:
         return False
 
-    # 🔹 Verify password
+    # 🔹 Step 3: Verify password
+    # bcrypt_context.verify() compares:
+    #   plain password (entered by user)
+    #   hashed password (stored in DB)
+    # If password is incorrect → return False
     if not bcrypt_context.verify(password, user.hashed_password):
         return False
 
-    # 🔹 If everything is correct
+    # 🔹 Step 4: If both checks pass → authentication successful
+    # Instead of returning True, we return the user object
+    # so we can use user details later (like id, username, etc.)
     return user
 
-# 🔥 WHAT THIS BLOCK DOES:
-# Checks:
-# ✔ user exists
-# ✔ password is correct
-
-
-# =========================
-# 🔹 CREATE JWT TOKEN
-# =========================
-
-def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
+#3 ---> Create JWT token and it is an function
+def create_access_token(username: str, user_id: int, expires_delta: timedelta):
 
     encode = {
-        "sub": username,   # subject (main identity)
-        "id": user_id,
-        "role": role
-    }
-
-    # 🔹 Add expiry
-    expires = datetime.now(timezone.utc) + expires_delta
-    encode.update({"exp": expires})
-
-    # 🔹 Create token
-    return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
-
-# 🔥 WHAT THIS BLOCK DOES:
-# Creates JWT token containing user info
+        'sub': username,
+        'id': user_id   
+          }
+    expires = datetime.now(timezone.utc)+expires_delta
+    encode.update({'exp':expires})
+    return jwt.encode(encode,SECRET_KEY,algorithm=ALGORITHM)
 
 
-# =========================
-# 🔹 GET CURRENT USER (LOCK) BY JWT TOKEN
-# =========================
-
+#5 ---> to get current user
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
-
     try:
-        # 🔹 Decode token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-
-        username = payload.get("sub")
-        user_id = payload.get("id")
-        role = payload.get("role")
-
-        # 🔹 If token invalid
-        if username is None or user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        return {
-            "username": username,
-            "id": user_id,
-            "role": role
-        }
-
+       payload = jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+       username: str = payload.get('sub')
+       user_id: int = payload.get('id')
+       if username is None or user_id is None:
+           raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED,
+                               detail  = 'Could Not validate User')
+       return {'username': username, 'id': user_id}
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED,
+                               detail  = 'Could Not validate User')
+        
+           
 
-# 🔥 WHAT THIS BLOCK DOES:
-# 🔐 PROTECTS ROUTES
-# ✔ Extract token
-# ✔ Decode token
-# ✔ Return user info
+#1
+#creating a user and adding into db
+@router.post('/',status_code=status.HTTP_201_CREATED)
+async def create_user(db: db_dependency,
+    create_user_request: CreateUserRequest):
 
-
-# =========================
-# 🔹 CREATE USER API
-# =========================
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_user(db: db_dependency, create_user_request: CreateUserRequest):
-
-    # 🔹 Check duplicate user
-    existing_user = db.query(Users).filter(
-        Users.username == create_user_request.username
-    ).first()
-
-    if existing_user:
-        raise HTTPException(status_code=400, detail="User already exists")
-
-    # 🔹 Create user
-    new_user = Users(
-        username=create_user_request.username,
-        email=create_user_request.email,
-        first_name=create_user_request.first_name,
-        last_name=create_user_request.last_name,
-        role=create_user_request.role,
-
-        # 🔐 Hash password
-        hashed_password=bcrypt_context.hash(create_user_request.password),
-
-        is_active=True
+    create_user_model = Users(
+        email = create_user_request.email,
+        username = create_user_request.username,
+        first_name = create_user_request.first_name,
+        last_name = create_user_request.last_name,
+        hashed_password = bcrypt_context.hash(create_user_request.password),
+        role = create_user_request.role,
+        is_active = True
     )
 
-    db.add(new_user)
+    db.add(create_user_model)
     db.commit()
 
-    return {"message": "User created"}
-
-# 🔥 WHAT THIS BLOCK DOES:
-# Registers user with hashed password
-
-
-# =========================
-# 🔹 LOGIN API (IMPORTANT BLOCK)
-# =========================
-
-@router.post("/token", response_model=Token)
-async def login(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: db_dependency
-):
-
-    # 🔥 IMPORTANT BLOCK
-    # form_data automatically gives:
-    # form_data.username
-    # form_data.password
-
-    user = authenticate_user(form_data.username, form_data.password, db)
-
+ 
+#4 ---> authenticate user using Auth function and if user exist it creates a access jwt  token for that user and it will return..
+@router.post('/token',response_model=Token)
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+                                 db: db_dependency):
+    user = authenticate_user(form_data.username, form_data.password,db)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    token = create_access_token(
-        user.username,
-        user.id,
-        user.role,
-        timedelta(minutes=20)
-    )
-
-    return {
-        "access_token": token,
-        "token_type": "bearer"
-    }
-
-# 🔥 WHAT THIS BLOCK DOES:
-# ✔ Takes username & password (FORM DATA)
-# ✔ Validates user
-# ✔ Generates JWT token
-# ✔ Returns token to client
+        raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED,
+                               detail  = 'Could Not validate User')
+    access_token = create_access_token(user.username,user.id,timedelta(minutes=20))
+    return {'access_token':access_token ,'token_type':'bearer'}
+    
