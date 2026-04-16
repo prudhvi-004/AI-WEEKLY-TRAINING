@@ -117,7 +117,7 @@ async def create_user(db: db_dependency,
     db.commit()
 
  
-#4
+#4 ---> authenticate user using Auth function and if user exist it creates a access jwt  token for that user and it will return..
 @router.post('/token',response_model=Token)
 async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
                                  db: db_dependency):
