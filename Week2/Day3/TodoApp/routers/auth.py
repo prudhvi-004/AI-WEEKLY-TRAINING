@@ -183,7 +183,7 @@ def create_access_token(username: str, user_id: int, role: str, expires_delta: t
 
 
 # =========================
-# 🔹 GET CURRENT USER (LOCK)
+# 🔹 GET CURRENT USER (LOCK) BY JWT TOKEN
 # =========================
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
