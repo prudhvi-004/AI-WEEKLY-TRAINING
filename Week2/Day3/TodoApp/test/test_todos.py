@@ -1,40 +1,14 @@
-# =========================
-# IMPORTS
-# =========================
-
-# create_engine is used to create database connection
-# text is used to run raw SQL queries (for cleanup)
 from sqlalchemy import create_engine, text
-
-# sessionmaker is used to create database sessions
 from sqlalchemy.orm import sessionmaker
-
-# StaticPool ensures a single shared connection (important for SQLite tests)
 from sqlalchemy.pool import StaticPool
-
-# importing main FastAPI app
 from main import app
-
-# Base is used to create tables, Todos is the ORM model
 from model import Base, Todos
-
-# importing dependencies to override (used in todos API)
 from routers.todos import get_db
 from routers.auth import get_current_user
-
-# pytest is used for testing framework
 import pytest
-
-# status provides HTTP status codes
 from fastapi import status
-
-# TestClient simulates API requests without running server
 from fastapi.testclient import TestClient
 
-
-# =========================
-# TEST DATABASE SETUP
-# =========================
 
 # separate database used only for testing
 SQLALCHEMY_TEST_URL = 'sqlite:///./testdb.db'
@@ -61,10 +35,7 @@ Test_SessionLocal = sessionmaker(
 Base.metadata.create_all(bind=engine)
 
 
-# =========================
-# OVERRIDES (NO DEEP EXPLANATION)
-# =========================
-
+#We use override_get_db to replace the real database with a test database during testing, so tests don’t affect actual data.
 def override_get_db():
     db = Test_SessionLocal()
     try:
@@ -73,6 +44,7 @@ def override_get_db():
         db.close()
 
 
+#We use override_get_current_user to bypass real authentication and provide a fake user during testing, so we can test protected endpoints without needing a real login or JWT token.
 def override_get_current_user():
     return {'username': 'bablu', 'id': 1, 'role': 'admin'}
 
@@ -82,9 +54,9 @@ app.dependency_overrides[get_db] = override_get_db
 app.dependency_overrides[get_current_user] = override_get_current_user
 
 
-# =========================
-# TEST CLIENT
-# =========================
+#=======================
+#TEST CLIENT 
+#========================
 
 # client will behave like a user calling the API
 client = TestClient(app)
@@ -123,21 +95,17 @@ def test_todo():
     with engine.connect() as connection:
         connection.execute(text("DELETE FROM todos;"))
         connection.commit()
-
-
-# =========================
-# TEST: GET ALL TODOS
-# =========================
-
 def test_read_all_authenticated(test_todo):
 
     # call API endpoint to get all todos
+    # this hits your FastAPI route @router.get("/")
     response = client.get("/")
 
-    # check response status is 200 OK
+    # check response status is 200 OK (request successful)
     assert response.status_code == status.HTTP_200_OK
 
     # check response data matches expected output
+    # ensures API returns correct list from database
     assert response.json() == [{
         'id': 1,
         'title': 'Learn to code!',
@@ -155,15 +123,16 @@ def test_read_all_authenticated(test_todo):
 def test_read_one_authenticated(test_todo):
 
     # call API to get todo with id=1
+    # matches route @router.get("/{todo_id}")
     response = client.get("/1")
 
-    # check status code
+    # check status code is 200 OK
     assert response.status_code == status.HTTP_200_OK
 
-    # get response data
+    # get response data (JSON → Python dict)
     data = response.json()
 
-    # validate important fields
+    # validate important fields to ensure correct data returned
     assert data['id'] == 1
     assert data['owner_id'] == 1
 
@@ -175,12 +144,13 @@ def test_read_one_authenticated(test_todo):
 def test_read_one_authenticated_not_found():
 
     # call API with non-existing ID
+    # database does not contain this ID
     response = client.get("/999")
 
-    # check status code is 404
+    # check status code is 404 (resource not found)
     assert response.status_code == 404
 
-    # check error message
+    # check error message returned by API
     assert response.json() == {'detail': 'Todo not found.'}
 
 
@@ -191,6 +161,7 @@ def test_read_one_authenticated_not_found():
 def test_create_todo():
 
     # request data to create new todo
+    # this will be sent as JSON body to API
     request_data = {
         'title': 'New Todo!',
         'description': 'New todo description',
@@ -199,17 +170,22 @@ def test_create_todo():
     }
 
     # call API to create todo
+    # matches route @router.post("/addtodo")
     response = client.post("/addtodo", json=request_data)
 
     # check status code is 201 CREATED
     assert response.status_code == status.HTTP_201_CREATED
 
     # verify data is stored in database
+    # directly querying DB to confirm insertion
     db = Test_SessionLocal()
     model = db.query(Todos).filter(Todos.id == 1).first()
 
-    # check stored data
-    assert model.title == request_data['title']
+    # check stored data matches request
+    assert model.title == request_data.get('title')
+    assert model.description == request_data.get('description')
+    assert model.priority == request_data.get('priority')
+    assert model.complete == request_data.get('complete')
 
 
 # =========================
@@ -218,7 +194,7 @@ def test_create_todo():
 
 def test_update_todo(test_todo):
 
-    # updated data
+    # updated data to modify existing todo
     request_data = {
         'title': 'Updated Title',
         'description': 'Updated Desc',
@@ -227,9 +203,10 @@ def test_update_todo(test_todo):
     }
 
     # call API to update todo
+    # matches route @router.put("/updatetodo/{todo_id}")
     response = client.put("/updatetodo/1", json=request_data)
 
-    # check status code is 204 (no content)
+    # check status code is 204 (success, no content returned)
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     # verify update in database
@@ -237,6 +214,7 @@ def test_update_todo(test_todo):
     model = db.query(Todos).filter(Todos.id == 1).first()
 
     # check updated value
+    # ensures API actually changed DB value
     assert model.title == 'Updated Title'
 
 
@@ -257,7 +235,7 @@ def test_update_todo_not_found():
     # call API with non-existing ID
     response = client.put("/updatetodo/999", json=request_data)
 
-    # check status code
+    # check status code is 404
     assert response.status_code == 404
 
     # check error message
@@ -271,9 +249,10 @@ def test_update_todo_not_found():
 def test_delete_todo(test_todo):
 
     # call API to delete todo
+    # matches route @router.delete("/deletetodo/{todo_id}")
     response = client.delete("/deletetodo/1")
 
-    # check status code
+    # check status code is 204 (success, no content)
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     # verify deletion from database
@@ -293,7 +272,7 @@ def test_delete_todo_not_found():
     # call API with non-existing ID
     response = client.delete("/deletetodo/999")
 
-    # check status code
+    # check status code is 404
     assert response.status_code == 404
 
     # check error response
