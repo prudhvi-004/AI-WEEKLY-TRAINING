@@ -96,7 +96,7 @@ async def read_all(user: user_dependency, db: db_dependency):
 # Multi-user system → must isolate data
 
 
-@router.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
+@router.get("/{todo_id}", status_code=status.HTTP_200_OK)
 async def read_todo(user: user_dependency, db: db_dependency,
                     todo_id: int = Path(gt=0)):
 
@@ -121,7 +121,7 @@ async def read_todo(user: user_dependency, db: db_dependency,
 # Double filtering prevents unauthorized access
 
 
-@router.post("/todo", status_code=status.HTTP_201_CREATED)
+@router.post("/addtodo", status_code=status.HTTP_201_CREATED)
 async def create_todo(user: user_dependency, db: db_dependency,
                       todo_request: TodoRequest):
 
@@ -141,7 +141,7 @@ async def create_todo(user: user_dependency, db: db_dependency,
 # model_dump() → converts Pydantic → dict
 
 
-@router.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.put("/updatetodo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def update_todo(user: user_dependency, db: db_dependency,
                       todo_request: TodoRequest,
                       todo_id: int = Path(gt=0)):
@@ -171,7 +171,7 @@ async def update_todo(user: user_dependency, db: db_dependency,
 # Ensures only owner can update
 
 
-@router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/deletetodo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_todo(user: user_dependency, db: db_dependency,
                       todo_id: int = Path(gt=0)):
 

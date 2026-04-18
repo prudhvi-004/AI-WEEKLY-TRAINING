@@ -34,15 +34,27 @@ class Token(BaseModel):
     token_type: str
 
 
+# Dependency function to provide database session to API routes
 def get_db():
+    
+    # 🔹 Create a new database session (connection)
+    # 👉 SessionLocal is a factory that creates DB sessions
     db = SessionLocal()
+    
     try:
+        # 🔹 Provide the DB session to the API
+        # 👉 'yield' sends db to wherever this dependency is used
+        # 👉 Execution pauses here until the API finishes
         yield db 
+    
     finally:
+        # 🔹 This block runs AFTER the API request is completed
+        # 👉 Ensures the DB connection is properly closed
+        # 👉 Prevents memory leaks and too many open connections
         db.close()
 
 
-db_dependency = Annotated[Session, Depends(get_db)]  #to get a db session insidea funtion so we can perform operations.
+db_dependency = Annotated[Session, Depends(get_db)]  #to get a db session inside a funtion so we can perform operations.
 
 #2 --> it is an function
 def authenticate_user(username: str, password: str, db):
@@ -81,7 +93,7 @@ def create_access_token(username: str, user_id: int, expires_delta: timedelta):
     return jwt.encode(encode,SECRET_KEY,algorithm=ALGORITHM)
 
 
-#5 ---> to get current user
+#5 ---> to get current user by JWT token
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     try:
        payload = jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
