@@ -99,7 +99,7 @@ def test_read_all_authenticated(test_todo):
 
     # call API endpoint to get all todos
     # this hits your FastAPI route @router.get("/")
-    response = client.get("/")
+    response = client.get("/todos/")
 
     # check response status is 200 OK (request successful)
     assert response.status_code == status.HTTP_200_OK
@@ -124,7 +124,7 @@ def test_read_one_authenticated(test_todo):
 
     # call API to get todo with id=1
     # matches route @router.get("/{todo_id}")
-    response = client.get("/1")
+    response = client.get("/todos/1")
 
     # check status code is 200 OK
     assert response.status_code == status.HTTP_200_OK
@@ -145,7 +145,7 @@ def test_read_one_authenticated_not_found():
 
     # call API with non-existing ID
     # database does not contain this ID
-    response = client.get("/999")
+    response = client.get("/todos/999")
 
     # check status code is 404 (resource not found)
     assert response.status_code == 404
@@ -171,7 +171,7 @@ def test_create_todo():
 
     # call API to create todo
     # matches route @router.post("/addtodo")
-    response = client.post("/addtodo", json=request_data)
+    response = client.post("/todos/addtodo", json=request_data)
 
     # check status code is 201 CREATED
     assert response.status_code == status.HTTP_201_CREATED
@@ -204,7 +204,7 @@ def test_update_todo(test_todo):
 
     # call API to update todo
     # matches route @router.put("/updatetodo/{todo_id}")
-    response = client.put("/updatetodo/1", json=request_data)
+    response = client.put("/todos/updatetodo/1", json=request_data)
 
     # check status code is 204 (success, no content returned)
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -233,7 +233,7 @@ def test_update_todo_not_found():
     }
 
     # call API with non-existing ID
-    response = client.put("/updatetodo/999", json=request_data)
+    response = client.put("/todos/updatetodo/999", json=request_data)
 
     # check status code is 404
     assert response.status_code == 404
@@ -250,7 +250,7 @@ def test_delete_todo(test_todo):
 
     # call API to delete todo
     # matches route @router.delete("/deletetodo/{todo_id}")
-    response = client.delete("/deletetodo/1")
+    response = client.delete("/todos/deletetodo/1")
 
     # check status code is 204 (success, no content)
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -270,7 +270,7 @@ def test_delete_todo(test_todo):
 def test_delete_todo_not_found():
 
     # call API with non-existing ID
-    response = client.delete("/deletetodo/999")
+    response = client.delete("/todos/deletetodo/999")
 
     # check status code is 404
     assert response.status_code == 404

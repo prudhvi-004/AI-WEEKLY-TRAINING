@@ -38,7 +38,7 @@ from .auth import get_current_user
 # WHY?
 # Extract logged-in user from JWT
 
-router = APIRouter()
+router = APIRouter(prefix = '/todos',tags= ['Todos'])
 
 # =========================
 # 🔹 DATABASE DEPENDENCY
